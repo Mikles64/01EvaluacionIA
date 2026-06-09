@@ -17,6 +17,21 @@ problema_seleccionado = st.sidebar.selectbox(
     ]
 )
 
+st.sidebar.markdown("---")
+st.sidebar.markdown(
+    "### Algoritmos por tipo de búsqueda\n"
+    "- **No informada** (Frozen Lake): BFS, DFS\n"
+    "- **Informada** (Sokoban): GBFS, A*\n"
+    "- **Local** (8 Reinas): Escalada Simple, Escalada Horizontal, "
+    "Reinicio Aleatorio, Recocido Simulado\n"
+    "- **Adversaria** (Gato): Minimax (Max / Min)"
+)
+
+st.write(
+    "Selecciona un **problema** en la barra lateral, elige el **algoritmo** "
+    "correspondiente, ejecuta el proceso y observa los **pasos principales** "
+    "de la búsqueda animados paso a paso."
+)
 st.write("---")
 
 # Enrutador

@@ -55,14 +55,22 @@ def heuristica(cajas, objetivos):
             total += min_dist
     return total
 
-def busqueda_a_estrella(paredes, objetivos, inicio_trabajador, inicio_cajas):
-    """Algoritmo A* para resolver Sokoban."""
-    # Cola de prioridad: (f_score, g_score, trabajador, cajas, camino_trabajador, camino_cajas)
-    # f_score = g_score (pasos dados) + heurística (pasos estimados a la meta)
+def busqueda_informada(paredes, objetivos, inicio_trabajador, inicio_cajas, algoritmo="A*"):
+    """Búsqueda informada para resolver Sokoban.
+
+    - A* (A-Estrella): prioriza f = g + h (coste real + heurística). Garantiza
+      la solución óptima si la heurística es admisible.
+    - GBFS (Greedy Best-First Search): prioriza únicamente h (solo la
+      heurística). Suele ser más rápido pero NO garantiza el camino óptimo.
+    """
+    # Cola de prioridad: (prioridad, contador, g_score, trabajador, cajas, camino_w, camino_c)
+    # El contador rompe empates y evita comparar tuplas no ordenables.
     cola = []
+    contador = 0
     h_inicial = heuristica(inicio_cajas, objetivos)
-    heapq.heappush(cola, (h_inicial, 0, inicio_trabajador, inicio_cajas, [inicio_trabajador], [inicio_cajas]))
-    
+    heapq.heappush(cola, (h_inicial, contador, 0, inicio_trabajador, inicio_cajas,
+                          [inicio_trabajador], [inicio_cajas]))
+
     # Set para evitar ciclos (Estado = trabajador + cajas)
     visitados = set()
     visitados.add((inicio_trabajador, inicio_cajas))
@@ -71,7 +79,7 @@ def busqueda_a_estrella(paredes, objetivos, inicio_trabajador, inicio_cajas):
     movimientos = [(0, -1), (0, 1), (-1, 0), (1, 0)] # Arriba, Abajo, Izquierda, Derecha
 
     while cola:
-        f, g, trabajador, cajas, camino_w, camino_c = heapq.heappop(cola)
+        _, _, g, trabajador, cajas, camino_w, camino_c = heapq.heappop(cola)
         nodos_explorados += 1
 
         # ¿Condición de victoria? (Todas las cajas están en los objetivos)
@@ -82,7 +90,7 @@ def busqueda_a_estrella(paredes, objetivos, inicio_trabajador, inicio_cajas):
 
         for dx, dy in movimientos:
             nx, ny = wx + dx, wy + dy # Nueva posición del trabajador
-            
+
             # Si el trabajador choca con una pared, movimiento inválido
             if (nx, ny) in paredes:
                 continue
@@ -94,28 +102,32 @@ def busqueda_a_estrella(paredes, objetivos, inicio_trabajador, inicio_cajas):
             if (nx, ny) in nuevas_cajas:
                 idx_caja = nuevas_cajas.index((nx, ny))
                 bx, by = nx + dx, ny + dy # Nueva posición de la caja empujada
-                
+
                 # Si la caja choca con una pared o con otra caja, movimiento inválido
                 if (bx, by) in paredes or (bx, by) in nuevas_cajas:
                     movimiento_valido = False
                 else:
                     nuevas_cajas[idx_caja] = (bx, by)
-            
+
             if movimiento_valido:
                 nuevas_cajas_tupla = tuple(nuevas_cajas)
                 estado = ((nx, ny), nuevas_cajas_tupla)
-                
+
                 if estado not in visitados:
                     visitados.add(estado)
                     nuevo_g = g + 1
-                    nuevo_f = nuevo_g + heuristica(nuevas_cajas_tupla, objetivos)
-                    
+                    h = heuristica(nuevas_cajas_tupla, objetivos)
+                    # A* usa f = g + h ; GBFS usa solo h (voraz)
+                    prioridad = (nuevo_g + h) if algoritmo == "A*" else h
+                    contador += 1
+
                     heapq.heappush(cola, (
-                        nuevo_f, 
-                        nuevo_g, 
-                        (nx, ny), 
-                        nuevas_cajas_tupla, 
-                        camino_w + [(nx, ny)], 
+                        prioridad,
+                        contador,
+                        nuevo_g,
+                        (nx, ny),
+                        nuevas_cajas_tupla,
+                        camino_w + [(nx, ny)],
                         camino_c + [nuevas_cajas_tupla]
                     ))
 
@@ -156,7 +168,7 @@ def renderizar_mapa(ancho, alto, paredes, objetivos, trabajador, cajas):
 
 def mostrar_interfaz():
     st.subheader("Búsqueda Informada: Sokoban")
-    st.write("El algoritmo A* utiliza heurísticas para guiar al trabajador 👷 a empujar las cajas 📦 hacia los objetivos 🎯 calculando la ruta óptima.")
+    st.write("La búsqueda informada utiliza heurísticas para guiar al trabajador 👷 a empujar las cajas 📦 hacia los objetivos 🎯.")
 
     paredes, objetivos, inicio_trabajador, inicio_cajas = parsear_mapa(MAPA_NIVEL)
     alto = len(MAPA_NIVEL)
@@ -166,10 +178,17 @@ def mostrar_interfaz():
 
     with col1:
         st.write("### Configuración")
-        st.write("**Algoritmo:** A* (A-Estrella)")
-        st.write("**Heurística:** Distancia Manhattan")
+        algoritmo = st.radio(
+            "Selecciona el algoritmo:",
+            ["A* (A-Estrella)", "GBFS (Voraz)"],
+        )
+        st.write("**Heurística:** Distancia Manhattan (caja → objetivo más cercano)")
+        if "A*" in algoritmo:
+            st.caption("A* = g + h · Garantiza la solución óptima.")
+        else:
+            st.caption("GBFS = h · Más rápido, pero no garantiza optimalidad.")
         velocidad = st.slider("Velocidad de animación", 0.1, 1.0, 0.4)
-        
+
         ejecutar = st.button("Resolver Nivel", type="primary")
 
     with col2:
@@ -181,9 +200,12 @@ def mostrar_interfaz():
         mapa_placeholder.markdown(renderizar_mapa(ancho, alto, paredes, objetivos, inicio_trabajador, inicio_cajas), unsafe_allow_html=True)
 
     if ejecutar:
-        info_placeholder.info("Ejecutando algoritmo A*...")
-        
-        camino_w, camino_c, nodos = busqueda_a_estrella(paredes, objetivos, inicio_trabajador, inicio_cajas)
+        clave = "A*" if "A*" in algoritmo else "GBFS"
+        info_placeholder.info(f"Ejecutando algoritmo {clave}...")
+
+        camino_w, camino_c, nodos = busqueda_informada(
+            paredes, objetivos, inicio_trabajador, inicio_cajas, algoritmo=clave
+        )
 
         if camino_w:
             # Animación
@@ -195,7 +217,7 @@ def mostrar_interfaz():
                     renderizar_mapa(ancho, alto, paredes, objetivos, trabajador_actual, cajas_actuales), 
                     unsafe_allow_html=True
                 )
-                info_placeholder.success(f"Paso {paso}/{len(camino_w)-1} | Nodos evaluados en total por A*: {nodos}")
+                info_placeholder.success(f"Paso {paso}/{len(camino_w)-1} | Nodos evaluados en total por {clave}: {nodos}")
                 time.sleep(velocidad)
             
             info_placeholder.success(f"¡Nivel resuelto óptimamente en {len(camino_w)-1} movimientos!")

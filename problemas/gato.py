@@ -56,7 +56,16 @@ def mejor_movimiento(tablero):
 # --- INTERFAZ STREAMLIT ---
 def mostrar_interfaz():
     st.subheader("Búsqueda Adversaria: Minimax (Gato)")
-    st.write("Juegas como **X**. La IA (O) utiliza el algoritmo Minimax para predecir todos los estados futuros posibles y elegir la ruta óptima.")
+    st.write(
+        "Juegas como **X**. La IA juega como **O** con el algoritmo **Minimax**, "
+        "que alterna nodos **MAX** (la IA maximiza su puntaje) y nodos **MIN** "
+        "(asume que tú minimizas su puntaje) para explorar todos los estados "
+        "futuros y elegir la jugada óptima."
+    )
+    st.info(
+        "🧠 **MAX** = turno de la IA (O) · **MIN** = turno del jugador (X). "
+        "La IA es imbatible: lo mejor que puedes lograr es un empate."
+    )
 
     if 'tablero_gato' not in st.session_state:
         st.session_state.tablero_gato = [" "] * 9
