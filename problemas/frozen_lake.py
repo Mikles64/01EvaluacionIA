@@ -1,6 +1,7 @@
 import streamlit as st
 import time
 from collections import deque
+from problemas import nerd
 
 # --- DEFINICIÓN DEL ENTORNO ---
 # El mapa es una cuadrícula de 4x4. Cada letra indica qué hay en esa casilla:
@@ -17,13 +18,13 @@ FILAS = len(MAPA_4x4)
 COLUMNAS = len(MAPA_4x4[0])
 INICIO = (0, 0)  # Posición (fila, columna) donde empieza el agente
 
-# Emojis que representan cada casilla para que el mapa se vea más claro en pantalla.
+# Iconos (Nerd Font) que representan cada casilla para que el mapa se vea claro.
 ICONOS = {
-    'S': "🧊",  # Inicio
-    'F': "❄️",  # Hielo seguro
-    'H': "🕳️",  # Agujero
-    'G': "🎁",  # Meta
-    'A': "🐧"   # Agente (pingüino)
+    'S': nerd.INICIO,   # Inicio
+    'F': nerd.HIELO,    # Hielo seguro
+    'H': nerd.AGUJERO,  # Agujero
+    'G': nerd.META,     # Meta
+    'A': nerd.AGENTE    # Agente
 }
 
 # --- ALGORITMOS DE BÚSQUEDA NO INFORMADA ---
@@ -101,28 +102,29 @@ def renderizar_mapa(posicion_agente):
         for c in range(COLUMNAS):
             celda = MAPA_4x4[f][c]
             # Mostrar el agente si está en esta casilla; si no, el icono de la casilla.
-            contenido = ICONOS['A'] if (f, c) == posicion_agente else ICONOS[celda]
+            glifo = ICONOS['A'] if (f, c) == posicion_agente else ICONOS[celda]
+            contenido = nerd.icono(glifo)  # Envolver el icono con la Nerd Font
 
             # Elegir el color de fondo según el tipo de casilla.
             color = "#E0F7FA" if celda in ['S', 'F'] else "#FFEBEE" if celda == 'H' else "#E8F5E9"
 
-            html += f"<td style='width:60px; height:60px; background-color:{color}; text-align:center; font-size:30px; border: 1px solid #ccc;'>{contenido}</td>"
+            html += f"<td style='width:60px; height:60px; background-color:{color}; text-align:center; border: 1px solid #ccc;'>{contenido}</td>"
         html += "</tr>"
     html += "</table>"
     return html
 
 def mostrar_interfaz():
     st.subheader("Búsqueda No Informada: Frozen Lake")
-    st.write("El pingüino 🐧 debe llegar al regalo 🎁 cruzando el hielo ❄️ sin caer en los agujeros 🕳️.")
+    st.write("El agente debe llegar a la meta cruzando el hielo seguro sin caer en los agujeros.")
 
     col1, col2 = st.columns([1, 2])
 
     with col1:
         st.write("### Configuración")
-        algoritmo = st.radio("Selecciona el algoritmo:", ["BFS (Búsqueda a lo ancho)", "DFS (Búsqueda en profundidad)"])
-        velocidad = st.slider("Velocidad de animación (segundos)", 0.1, 1.0, 0.4)
+        algoritmo = st.radio("Selecciona el algoritmo:", ["BFS (Búsqueda a lo ancho)", "DFS (Búsqueda en profundidad)"], key="fl_algoritmo")
+        velocidad = st.slider("Velocidad de animación (segundos)", 0.1, 1.0, 0.4, key="fl_velocidad")
 
-        ejecutar = st.button("Ejecutar Búsqueda", type="primary")
+        ejecutar = st.button("Ejecutar Búsqueda", type="primary", key="fl_ejecutar")
 
     with col2:
         st.write("### Visualización del Entorno")

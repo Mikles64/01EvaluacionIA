@@ -2,9 +2,13 @@
 
 Aplicación interactiva construida con **Streamlit** que permite **visualizar y
 comparar** algoritmos de búsqueda aplicados a cuatro tipos de problemas clásicos
-de Inteligencia Artificial. Para cada problema puedes **seleccionar el algoritmo**,
-**ejecutar el proceso** y **observar los pasos principales** de la búsqueda
-animados paso a paso.
+de Inteligencia Artificial. La navegación es por **pestañas** (una por tipo de
+búsqueda); en cada una puedes **seleccionar el algoritmo**, **ejecutar el
+proceso** y **observar los pasos principales** de la búsqueda animados paso a paso.
+
+La interfaz usa iconos de una **Nerd Font** (Symbols Nerd Font, incrustada en
+`assets/fonts/` y cargada con `@font-face`) en lugar de emojis, por lo que se ve
+igual en cualquier equipo sin necesidad de instalar nada.
 
 ## Problemas y algoritmos
 
@@ -44,9 +48,13 @@ Luego abre la URL local que muestra Streamlit (por defecto http://localhost:8501
 
 ```
 01EvaluacionIA/
-├── app.py                  # Interfaz principal y enrutador de problemas
+├── app.py                  # Interfaz principal con pestañas (navbar)
 ├── requirements.txt
+├── assets/
+│   └── fonts/
+│       └── SymbolsNerdFont-Regular.ttf   # Nerd Font incrustada (iconos)
 └── problemas/
+    ├── nerd.py             # Carga de la Nerd Font e iconos
     ├── frozen_lake.py      # Búsqueda no informada (BFS, DFS)
     ├── sokoban.py          # Búsqueda informada (A*, GBFS)
     ├── reinas.py           # Búsqueda local (4 algoritmos)

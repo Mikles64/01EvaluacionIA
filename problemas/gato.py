@@ -1,5 +1,6 @@
 import streamlit as st
 import math
+from problemas import nerd
 
 # --- LÓGICA DE MINIMAX ---
 # El tablero se representa como una lista de 9 casillas (índices 0 a 8), donde
@@ -84,7 +85,7 @@ def mostrar_interfaz():
         "futuros y elegir la jugada óptima."
     )
     st.info(
-        "🧠 **MAX** = turno de la IA (O) · **MIN** = turno del jugador (X). "
+        f"{nerd.IDEA} **MAX** = turno de la IA (O) · **MIN** = turno del jugador (X). "
         "La IA es imbatible: lo mejor que puedes lograr es un empate."
     )
 
@@ -128,7 +129,7 @@ def mostrar_interfaz():
         else:
             st.success(f"Ganador: {st.session_state.ganador_gato}")
 
-        if st.button("Reiniciar Juego"):
+        if st.button("Reiniciar Juego", key="gato_reiniciar"):
             st.session_state.tablero_gato = [" "] * 9
             st.session_state.ganador_gato = None
             st.rerun()
