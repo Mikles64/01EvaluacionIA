@@ -1,6 +1,7 @@
 import streamlit as st
 import heapq
 import time
+from problemas import nerd
 
 # --- DEFINICIÓN DEL ENTORNO ---
 # El nivel se describe con texto. Cada carácter representa un elemento:
@@ -17,14 +18,14 @@ MAPA_NIVEL = [
     "########"
 ]
 
-# Emojis para dibujar cada elemento del mapa en pantalla.
+# Iconos (Nerd Font) para dibujar cada elemento del mapa en pantalla.
 ICONOS = {
-    '#': "🧱",
-    ' ': "⬛",
-    'T': "🎯",
-    'B': "📦",
-    'W': "👷",
-    'X': "✅"  # Caja colocada correctamente sobre un objetivo
+    '#': nerd.PARED,
+    ' ': "",            # Piso libre: sin icono
+    'T': nerd.OBJETIVO,
+    'B': nerd.CAJA,
+    'W': nerd.TRABAJADOR,
+    'X': nerd.CHECK     # Caja colocada correctamente sobre un objetivo
 }
 
 def parsear_mapa(mapa):
@@ -182,14 +183,14 @@ def renderizar_mapa(ancho, alto, paredes, objetivos, trabajador, cajas):
                 contenido = ICONOS[' ']
                 color = "#FAFAFA"
 
-            html += f"<td style='width:60px; height:60px; background-color:{color}; text-align:center; font-size:30px; border: 1px solid #ccc;'>{contenido}</td>"
+            html += f"<td style='width:60px; height:60px; background-color:{color}; text-align:center; border: 1px solid #ccc;'>{nerd.icono(contenido)}</td>"
         html += "</tr>"
     html += "</table>"
     return html
 
 def mostrar_interfaz():
     st.subheader("Búsqueda Informada: Sokoban")
-    st.write("La búsqueda informada utiliza heurísticas para guiar al trabajador 👷 a empujar las cajas 📦 hacia los objetivos 🎯.")
+    st.write("La búsqueda informada utiliza heurísticas para guiar al trabajador a empujar las cajas hacia los objetivos.")
 
     # Leer el nivel y averiguar sus dimensiones.
     paredes, objetivos, inicio_trabajador, inicio_cajas = parsear_mapa(MAPA_NIVEL)
@@ -203,15 +204,16 @@ def mostrar_interfaz():
         algoritmo = st.radio(
             "Selecciona el algoritmo:",
             ["A* (A-Estrella)", "GBFS (Voraz)"],
+            key="sk_algoritmo",
         )
         st.write("**Heurística:** Distancia Manhattan (caja → objetivo más cercano)")
         if "A*" in algoritmo:
             st.caption("A* = g + h · Garantiza la solución óptima.")
         else:
             st.caption("GBFS = h · Más rápido, pero no garantiza optimalidad.")
-        velocidad = st.slider("Velocidad de animación", 0.1, 1.0, 0.4)
+        velocidad = st.slider("Velocidad de animación", 0.1, 1.0, 0.4, key="sk_velocidad")
 
-        ejecutar = st.button("Resolver Nivel", type="primary")
+        ejecutar = st.button("Resolver Nivel", type="primary", key="sk_ejecutar")
 
     with col2:
         st.write("### Visualización del Entorno")

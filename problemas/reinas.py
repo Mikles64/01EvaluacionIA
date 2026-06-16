@@ -3,6 +3,7 @@ import numpy as np
 import random
 import math
 import time
+from problemas import nerd
 
 # --- LÓGICA DEL PROBLEMA DE LAS 8 REINAS ---
 # Objetivo: colocar 8 reinas en un tablero de 8x8 sin que ninguna ataque a otra.
@@ -186,7 +187,7 @@ def _animar(historial, placeholder_tablero, placeholder_info, velocidad, prefijo
     total = len(historial)
     for paso, (estado, conflictos) in enumerate(historial):
         placeholder_tablero.markdown(renderizar_tablero(estado), unsafe_allow_html=True)
-        estado_txt = "✅ ¡Solución sin conflictos!" if conflictos == 0 else f"Conflictos: {conflictos}"
+        estado_txt = f"{nerd.CHECK} ¡Solución sin conflictos!" if conflictos == 0 else f"Conflictos: {conflictos}"
         placeholder_info.info(f"{prefijo}Paso {paso}/{total - 1} | {estado_txt}")
         time.sleep(velocidad)  # Pausar para que la animación sea visible
     return historial[-1][1]
@@ -212,14 +213,15 @@ def mostrar_interfaz():
                 "Reinicio Aleatorio",
                 "Recocido Simulado",
             ],
+            key="rn_algoritmo",
         )
-        velocidad = st.slider("Velocidad de animación (s)", 0.05, 1.0, 0.25)
+        velocidad = st.slider("Velocidad de animación (s)", 0.05, 1.0, 0.25, key="rn_velocidad")
 
         # Crear un tablero de partida nuevo y aleatorio cuando se pulse el botón.
-        if st.button("Generar Estado Inicial Aleatorio"):
+        if st.button("Generar Estado Inicial Aleatorio", key="rn_generar"):
             st.session_state.reinas_estado = list(np.random.randint(0, N, N))
 
-        ejecutar = st.button("Ejecutar Búsqueda", type="primary")
+        ejecutar = st.button("Ejecutar Búsqueda", type="primary", key="rn_ejecutar")
 
     with col2:
         st.write("### Visualización del Tablero")
@@ -260,16 +262,16 @@ def mostrar_interfaz():
             for intento, historial in historial_global:
                 final = _animar(
                     historial, placeholder_tablero, placeholder_info, velocidad,
-                    prefijo=f"🔄 Reinicio #{intento} | ",
+                    prefijo=f"{nerd.REINICIO} Reinicio #{intento} | ",
                 )
             st.session_state.reinas_estado = historial_global[-1][1][-1][0]
 
         # Informar el resultado final: solución encontrada o atasco en óptimo local.
         if final == 0:
-            placeholder_info.success("✅ ¡Solución encontrada! Las 8 reinas están a salvo.")
+            placeholder_info.success(f"{nerd.CHECK} ¡Solución encontrada! Las 8 reinas están a salvo.")
             st.balloons()
         else:
             placeholder_info.error(
-                f"⚠️ El algoritmo se detuvo en un óptimo local con {final} conflictos. "
+                f"{nerd.ALERTA} El algoritmo se detuvo en un óptimo local con {final} conflictos. "
                 "Prueba otro algoritmo o genera un nuevo estado inicial."
             )

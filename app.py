@@ -1,25 +1,22 @@
 import streamlit as st
-from problemas import gato, reinas, frozen_lake, sokoban # Importaremos los demás después
+from problemas import gato, reinas, frozen_lake, sokoban, nerd
 
 st.set_page_config(page_title="Visualizador de Búsqueda IA", layout="wide")
 
+# Cargar la Nerd Font para poder usar iconos en lugar de emojis.
+nerd.cargar_fuente()
+
 st.title("Visualizador de Algoritmos de Búsqueda")
 
-# Menú lateral
-st.sidebar.header("Configuración")
-problema_seleccionado = st.sidebar.selectbox(
-    "Selecciona el problema:",
-    [
-        "Gato / Tic-Tac-Toe (Adversaria)", 
-        "8 Reinas (Local)", 
-        "Frozen Lake (No informada)", 
-        "Sokoban (Informada)"
-    ]
+st.write(
+    "Elige una **pestaña** según el tipo de búsqueda, selecciona el **algoritmo**, "
+    "ejecuta el proceso y observa los **pasos principales** de la búsqueda "
+    "animados paso a paso."
 )
 
-st.sidebar.markdown("---")
+# Leyenda de algoritmos disponibles, siempre visible en la barra lateral.
+st.sidebar.header("Algoritmos por tipo de búsqueda")
 st.sidebar.markdown(
-    "### Algoritmos por tipo de búsqueda\n"
     "- **No informada** (Frozen Lake): BFS, DFS\n"
     "- **Informada** (Sokoban): GBFS, A*\n"
     "- **Local** (8 Reinas): Escalada Simple, Escalada Horizontal, "
@@ -27,19 +24,19 @@ st.sidebar.markdown(
     "- **Adversaria** (Gato): Minimax (Max / Min)"
 )
 
-st.write(
-    "Selecciona un **problema** en la barra lateral, elige el **algoritmo** "
-    "correspondiente, ejecuta el proceso y observa los **pasos principales** "
-    "de la búsqueda animados paso a paso."
-)
-st.write("---")
+# Navegación por pestañas en la parte superior (un panel por problema).
+tab_frozen, tab_sokoban, tab_reinas, tab_gato = st.tabs([
+    "Frozen Lake (No informada)",
+    "Sokoban (Informada)",
+    "8 Reinas (Local)",
+    "Gato / Tic-Tac-Toe (Adversaria)",
+])
 
-# Enrutador
-if problema_seleccionado == "Gato / Tic-Tac-Toe (Adversaria)":
-    gato.mostrar_interfaz()
-elif problema_seleccionado == "8 Reinas (Local)":
-    reinas.mostrar_interfaz()
-elif problema_seleccionado == "Frozen Lake (No informada)":
+with tab_frozen:
     frozen_lake.mostrar_interfaz()
-elif problema_seleccionado == "Sokoban (Informada)":
+with tab_sokoban:
     sokoban.mostrar_interfaz()
+with tab_reinas:
+    reinas.mostrar_interfaz()
+with tab_gato:
+    gato.mostrar_interfaz()
