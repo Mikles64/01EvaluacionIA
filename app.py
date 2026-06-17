@@ -9,9 +9,11 @@ nerd.cargar_fuente()
 st.title("Visualizador de Algoritmos de Búsqueda")
 
 st.write(
-    "Elige una **pestaña** según el tipo de búsqueda, selecciona el **algoritmo**, "
-    "ejecuta el proceso y observa los **pasos principales** de la búsqueda "
-    "animados paso a paso."
+    "Elige una **pestaña** según el tipo de búsqueda, selecciona el **algoritmo** "
+    "y ejecuta el proceso. Debajo del diagrama aparece una **traza paso a paso**: "
+    "usa el deslizador (o los botones Anterior/Siguiente) para avanzar iteración "
+    "por iteración y leer qué hace el algoritmo (OPEN/CLOSED, pila/cola, g/h/f, "
+    "conflictos, temperatura, valores minimax, etc.)."
 )
 
 # Leyenda de algoritmos disponibles, siempre visible en la barra lateral.

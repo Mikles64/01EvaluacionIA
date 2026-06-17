@@ -10,6 +10,21 @@ La interfaz usa iconos de una **Nerd Font** (Symbols Nerd Font, incrustada en
 `assets/fonts/` y cargada con `@font-face`) en lugar de emojis, por lo que se ve
 igual en cualquier equipo sin necesidad de instalar nada.
 
+### Traza paso a paso
+
+Debajo del diagrama de cada problema aparece una **traza** con un control
+(deslizador y botones Anterior/Siguiente) para avanzar **iteración por
+iteración** y leer qué hace el algoritmo en cada paso:
+
+- **Frozen Lake (BFS/DFS):** contenido de OPEN (cola/pila) y CLOSED (visitados),
+  nodo expandido y vecinos añadidos. El mapa resalta frontera, visitados y camino.
+- **Sokoban (A*/GBFS):** nodo extraído con sus valores `g`, `h` y `f`, los
+  sucesores generados con sus costes y el tamaño de OPEN y CLOSED.
+- **8 Reinas (locales):** conflictos (`h`) en cada paso, vecino elegido, pasos
+  laterales, temperatura y probabilidad de aceptación (recocido), reinicios.
+- **Gato (Minimax):** valor minimax de cada jugada candidata de la IA (nodo MAX)
+  y la jugada finalmente elegida.
+
 ## Problemas y algoritmos
 
 | Tipo de búsqueda | Problema | Algoritmos disponibles |

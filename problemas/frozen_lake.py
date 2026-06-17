@@ -1,7 +1,6 @@
 import streamlit as st
-import time
 from collections import deque
-from problemas import nerd
+from problemas import nerd, traza
 
 # --- DEFINICIÓN DEL ENTORNO ---
 # El mapa es una cuadrícula de 4x4. Cada letra indica qué hay en esa casilla:
@@ -27,6 +26,17 @@ ICONOS = {
     'A': nerd.AGENTE    # Agente
 }
 
+
+# --- HERRAMIENTAS PARA DESCRIBIR LA TRAZA ---
+
+def _fmt(posiciones):
+    """Formatear una colección de posiciones como texto legible."""
+    posiciones = list(posiciones)
+    if not posiciones:
+        return "(vacío)"
+    return ", ".join(f"({x},{y})" for x, y in posiciones)
+
+
 # --- ALGORITMOS DE BÚSQUEDA NO INFORMADA ---
 # "No informada" significa que el algoritmo no tiene pistas sobre dónde está la
 # meta: explora el mapa a ciegas siguiendo una estrategia fija de orden.
@@ -43,75 +53,120 @@ def obtener_vecinos(x, y):
             vecinos.append((nx, ny))
     return vecinos
 
-def busqueda_bfs():
-    """BFS (búsqueda en anchura): explorar el mapa por niveles, revisando primero
-    las casillas más cercanas al inicio. Por eso siempre encuentra la ruta más
-    corta. Usa una COLA: lo primero que entra es lo primero en salir (FIFO)."""
-    # Cada elemento guarda la posición actual y el camino seguido hasta ella.
-    cola = deque([(INICIO, [INICIO])])
-    visitados = set([INICIO])  # Casillas ya vistas, para no repetirlas
-    nodos_explorados = 0
 
-    while cola:
-        (x, y), camino = cola.popleft()  # Sacar el más antiguo (FIFO)
-        nodos_explorados += 1
+def buscar(modo):
+    """Ejecutar BFS o DFS guardando una TRAZA de cada iteración.
 
-        # Si esta casilla es la meta, devolver el camino encontrado.
-        if MAPA_4x4[x][y] == 'G':
-            return camino, nodos_explorados
+    - BFS usa una COLA (FIFO): saca primero el nodo más antiguo de OPEN.
+    - DFS usa una PILA (LIFO): saca primero el nodo más reciente de OPEN.
 
-        # Agregar a la cola los vecinos seguros que aún no se hayan visitado.
-        for nx, ny in obtener_vecinos(x, y):
-            if (nx, ny) not in visitados and MAPA_4x4[nx][ny] != 'H':
-                visitados.add((nx, ny))
-                cola.append(((nx, ny), camino + [(nx, ny)]))
+    OPEN = frontera (nodos por explorar). CLOSED = visitados (ya procesados).
+    Devolver (camino, traza). Cada paso de la traza incluye la posición actual,
+    los conjuntos OPEN/CLOSED para dibujarlos y un texto explicativo.
+    """
+    es_bfs = (modo == "BFS")
+    # La frontera (OPEN) guarda parejas (posición, camino hasta ella).
+    frontera = deque([(INICIO, [INICIO])])
+    visitados = set([INICIO])  # CLOSED: casillas ya vistas, para no repetirlas
+    traza = []
+    camino_final = None
+    it = 0
 
-    return None, nodos_explorados  # No existe ruta posible
+    while frontera:
+        it += 1
+        # Sacar el siguiente nodo según la estrategia (FIFO en BFS, LIFO en DFS).
+        if es_bfs:
+            (x, y), camino = frontera.popleft()   # Más antiguo
+        else:
+            (x, y), camino = frontera.pop()       # Más reciente
 
-def busqueda_dfs():
-    """DFS (búsqueda en profundidad): seguir un camino hasta el fondo antes de
-    retroceder y probar otro. No garantiza la ruta más corta. Usa una PILA: lo
-    último que entra es lo primero en salir (LIFO)."""
-    # Cada elemento guarda la posición actual y el camino seguido hasta ella.
-    pila = [(INICIO, [INICIO])]
-    visitados = set([INICIO])
-    nodos_explorados = 0
+        es_meta = MAPA_4x4[x][y] == 'G'
+        nuevos = []
 
-    while pila:
-        (x, y), camino = pila.pop()  # Sacar el más reciente (LIFO)
-        nodos_explorados += 1
+        # Si no es la meta, generar y agregar los vecinos válidos a la frontera.
+        if not es_meta:
+            for nx, ny in obtener_vecinos(x, y):
+                if (nx, ny) not in visitados and MAPA_4x4[nx][ny] != 'H':
+                    visitados.add((nx, ny))
+                    frontera.append(((nx, ny), camino + [(nx, ny)]))
+                    nuevos.append((nx, ny))
 
-        if MAPA_4x4[x][y] == 'G':
-            return camino, nodos_explorados
+        # Posiciones que quedan en OPEN tras esta iteración (para dibujar/describir).
+        open_pos = [p for p, _ in frontera]
 
-        for nx, ny in obtener_vecinos(x, y):
-            if (nx, ny) not in visitados and MAPA_4x4[nx][ny] != 'H':
-                visitados.add((nx, ny))
-                pila.append(((nx, ny), camino + [(nx, ny)]))
+        # Construir el texto explicativo de esta iteración.
+        estructura = "COLA (FIFO)" if es_bfs else "PILA (LIFO)"
+        extremo = "frente → fondo" if es_bfs else "cima → fondo"
+        open_ordenada = open_pos if es_bfs else list(reversed(open_pos))
+        lineas = [
+            f"ITERACIÓN {it}  ·  {modo}",
+            "",
+            f"Nodo extraído de OPEN: ({x},{y})  [casilla '{MAPA_4x4[x][y]}']",
+            f"¿Es la meta?: {'SÍ' if es_meta else 'no'}",
+        ]
+        if not es_meta:
+            if nuevos:
+                lineas.append(f"Vecinos válidos añadidos a OPEN: {_fmt(nuevos)}")
+            else:
+                lineas.append("Vecinos válidos añadidos a OPEN: (ninguno nuevo)")
+        lineas += [
+            "",
+            f"OPEN  ({estructura}, {extremo}): {_fmt(open_ordenada)}",
+            f"CLOSED (visitados): {_fmt(sorted(visitados))}",
+        ]
+        if es_meta:
+            lineas += [
+                "",
+                f"¡META encontrada! Camino de {len(camino) - 1} pasos:",
+                _fmt(camino),
+            ]
 
-    return None, nodos_explorados
+        traza.append({
+            "pos": (x, y),
+            "visitados": set(visitados),
+            "frontera": set(open_pos),
+            "camino": set(camino) if es_meta else set(),
+            "texto": "\n".join(lineas),
+        })
+
+        if es_meta:
+            camino_final = camino
+            break
+
+    return camino_final, traza
+
 
 # --- INTERFAZ STREAMLIT ---
 
-def renderizar_mapa(posicion_agente):
-    """Construir el mapa como una tabla HTML, dibujando el pingüino en la
-    posición indicada y cada casilla con su emoji y color de fondo."""
+def renderizar_mapa(posicion_agente, visitados=frozenset(), frontera=frozenset(), camino=frozenset()):
+    """Construir el mapa como tabla HTML. Además del agente, resaltar las
+    casillas de CLOSED (visitados), de OPEN (frontera) y del camino final."""
     html = "<table style='border-collapse: collapse; margin-left: auto; margin-right: auto;'>"
     for f in range(FILAS):
         html += "<tr>"
         for c in range(COLUMNAS):
             celda = MAPA_4x4[f][c]
+            pos = (f, c)
             # Mostrar el agente si está en esta casilla; si no, el icono de la casilla.
-            glifo = ICONOS['A'] if (f, c) == posicion_agente else ICONOS[celda]
-            contenido = nerd.icono(glifo)  # Envolver el icono con la Nerd Font
+            glifo = ICONOS['A'] if pos == posicion_agente else ICONOS[celda]
+            contenido = nerd.icono(glifo)
 
-            # Elegir el color de fondo según el tipo de casilla.
+            # Color base según el tipo de casilla.
             color = "#E0F7FA" if celda in ['S', 'F'] else "#FFEBEE" if celda == 'H' else "#E8F5E9"
+            # Resaltados (de menor a mayor prioridad visual).
+            if pos in camino:
+                color = "#C8E6C9"   # Camino final: verde
+            elif pos in visitados:
+                color = "#ECEFF1"   # CLOSED: gris
+            if pos in frontera:
+                color = "#FFF59D"   # OPEN: amarillo
+            borde = "3px solid #1976D2" if pos == posicion_agente else "1px solid #ccc"
 
-            html += f"<td style='width:60px; height:60px; background-color:{color}; text-align:center; border: 1px solid #ccc;'>{contenido}</td>"
+            html += f"<td style='width:60px; height:60px; background-color:{color}; text-align:center; border:{borde};'>{contenido}</td>"
         html += "</tr>"
     html += "</table>"
     return html
+
 
 def mostrar_interfaz():
     st.subheader("Búsqueda No Informada: Frozen Lake")
@@ -121,36 +176,43 @@ def mostrar_interfaz():
 
     with col1:
         st.write("### Configuración")
-        algoritmo = st.radio("Selecciona el algoritmo:", ["BFS (Búsqueda a lo ancho)", "DFS (Búsqueda en profundidad)"], key="fl_algoritmo")
-        velocidad = st.slider("Velocidad de animación (segundos)", 0.1, 1.0, 0.4, key="fl_velocidad")
-
+        algoritmo = st.radio(
+            "Selecciona el algoritmo:",
+            ["BFS (Búsqueda a lo ancho)", "DFS (Búsqueda en profundidad)"],
+            key="fl_algoritmo",
+        )
+        st.caption("Amarillo = OPEN (frontera) · Gris = CLOSED (visitados) · "
+                   "Verde = camino final · Borde azul = nodo actual.")
         ejecutar = st.button("Ejecutar Búsqueda", type="primary", key="fl_ejecutar")
 
     with col2:
         st.write("### Visualización del Entorno")
-        # Contenedores vacíos que se irán actualizando para animar la búsqueda.
         mapa_placeholder = st.empty()
-        info_placeholder = st.empty()
 
-        # Dibujar el mapa en su estado inicial.
-        mapa_placeholder.markdown(renderizar_mapa(INICIO), unsafe_allow_html=True)
-
+    # Al pulsar el botón, calcular la traza y guardarla para recorrerla luego.
     if ejecutar:
-        info_placeholder.info("Calculando ruta...")
+        modo = "BFS" if "BFS" in algoritmo else "DFS"
+        camino, t = buscar(modo)
+        st.session_state["fl_traza"] = t
+        st.session_state["fl_camino"] = camino
+        traza.nuevo_run("fl")
 
-        # Ejecutar el algoritmo elegido para obtener el camino hacia la meta.
-        if "BFS" in algoritmo:
-            camino, nodos = busqueda_bfs()
-        else:
-            camino, nodos = busqueda_dfs()
-
+    t = st.session_state.get("fl_traza")
+    if t:
+        # Control para recorrer la traza iteración por iteración.
+        idx = traza.selector("fl", len(t))
+        paso = t[idx]
+        # Dibujar el mapa correspondiente a la iteración seleccionada.
+        mapa_placeholder.markdown(
+            renderizar_mapa(paso["pos"], paso["visitados"], paso["frontera"], paso["camino"]),
+            unsafe_allow_html=True,
+        )
+        camino = st.session_state.get("fl_camino")
         if camino:
-            # Recorrer el camino paso a paso, redibujando el mapa en cada posición.
-            for paso, (px, py) in enumerate(camino):
-                mapa_placeholder.markdown(renderizar_mapa((px, py)), unsafe_allow_html=True)
-                info_placeholder.success(f"Paso {paso}/{len(camino)-1} | Nodos explorados en total: {nodos}")
-                time.sleep(velocidad)  # Pausar para que la animación sea visible
-
-            info_placeholder.success(f"¡Meta alcanzada en {len(camino)-1} pasos! (Algoritmo evaluó {nodos} nodos)")
+            st.success(f"Solución encontrada: {len(camino) - 1} pasos · {len(t)} iteraciones (nodos expandidos).")
         else:
-            info_placeholder.error("No se encontró una ruta posible.")
+            st.error("No se encontró una ruta posible.")
+        traza.caja(paso["texto"])
+    else:
+        # Sin ejecución todavía: mostrar el mapa en su estado inicial.
+        mapa_placeholder.markdown(renderizar_mapa(INICIO), unsafe_allow_html=True)
