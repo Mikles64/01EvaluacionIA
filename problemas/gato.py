@@ -1,6 +1,6 @@
 import streamlit as st
 import math
-from problemas import nerd
+from problemas import nerd, traza
 
 # --- LÓGICA DE MINIMAX ---
 # El tablero se representa como una lista de 9 casillas (índices 0 a 8), donde
@@ -61,21 +61,77 @@ def minimax(tablero, profundidad, es_maximizador):
         return mejor_puntaje
 
 def mejor_movimiento(tablero):
-    """Decidir la mejor casilla para la IA: probar cada casilla libre, evaluarla
-    con minimax y quedarse con la de mayor puntaje."""
+    """Decidir la mejor casilla para la IA y, de paso, registrar una TRAZA con la
+    evaluación de cada jugada candidata (un nodo MAX). Devolver (jugada, traza)."""
+    libres = [i for i in range(9) if tablero[i] == " "]
     mejor_puntaje = -math.inf
     movimiento = None
-    for i in range(9):
-        if tablero[i] == " ":
-            tablero[i] = "O"  # La IA juega como 'O'
-            puntaje = minimax(tablero, 0, False)
-            tablero[i] = " "  # Deshacer la prueba para no alterar el tablero real
-            if puntaje > mejor_puntaje:
-                mejor_puntaje = puntaje
-                movimiento = i
-    return movimiento
+    evaluaciones = []
+    t = []
+
+    for k, i in enumerate(libres, 1):
+        tablero[i] = "O"                 # Probar la jugada de la IA
+        puntaje = minimax(tablero, 0, False)
+        tablero[i] = " "                 # Deshacer la prueba
+        evaluaciones.append((i, puntaje))
+        if puntaje > mejor_puntaje:
+            mejor_puntaje = puntaje
+            movimiento = i
+
+        fila, col = divmod(i, 3)
+        muestra = tablero.copy()
+        muestra[i] = "O"
+        texto = (
+            f"CANDIDATO {k}/{len(libres)}  ·  nodo MAX (turno de la IA)\n\n"
+            f"Probar O en la casilla {i} (fila {fila}, columna {col}).\n"
+            f"Luego le tocaría al jugador (nodo MIN).\n\n"
+            f"minimax explora todas las respuestas → valor = {puntaje}\n"
+            f"  (valor > 0 favorece a la IA, < 0 al jugador, 0 = empate;\n"
+            f"   cuanto más cerca de +10, gana más rápido)\n\n"
+            f"Mejor valor hasta ahora: {mejor_puntaje} (casilla {movimiento})"
+        )
+        t.append({"tablero": muestra, "resaltar": i, "texto": texto})
+
+    # Paso final: la decisión del nodo MAX.
+    muestra = tablero.copy()
+    if movimiento is not None:
+        muestra[movimiento] = "O"
+    resumen = " · ".join(f"casilla {i}={v}" for i, v in evaluaciones)
+    t.append({
+        "tablero": muestra,
+        "resaltar": movimiento,
+        "texto": (
+            f"DECISIÓN  ·  nodo MAX\n\n"
+            f"Valor de cada jugada posible:\n  {resumen}\n\n"
+            f"La IA elige la casilla {movimiento} por tener el valor MÁXIMO ({mejor_puntaje})."
+        ),
+    })
+    return movimiento, t
+
 
 # --- INTERFAZ STREAMLIT ---
+
+def renderizar_tablero(tablero, resaltar=None):
+    """Dibujar un tablero de gato (solo lectura) como tabla HTML, resaltando una
+    casilla. Se usa para mostrar cada paso de la traza de decisión de la IA."""
+    html = "<table style='border-collapse: collapse; margin-left:auto; margin-right:auto;'>"
+    for fila in range(3):
+        html += "<tr>"
+        for col in range(3):
+            i = fila * 3 + col
+            valor = tablero[i]
+            color = "#FFE082" if i == resaltar else "#FAFAFA"
+            texto_color = "#1565C0" if valor == "O" else "#C62828"
+            html += (
+                f"<td style='width:60px; height:60px; background-color:{color}; "
+                f"border:1px solid #999; text-align:center; font-size:34px; "
+                f"font-weight:bold; color:{texto_color};'>{valor if valor != ' ' else ''}</td>"
+            )
+        html += "</tr>"
+    html += "</table>"
+    return html
+
+
 def mostrar_interfaz():
     st.subheader("Búsqueda Adversaria: Minimax (Gato)")
     st.write(
@@ -101,12 +157,14 @@ def mostrar_interfaz():
             st.session_state.tablero_gato[idx] = "X"
             st.session_state.ganador_gato = verificar_ganador(st.session_state.tablero_gato)
 
-            # Turno de la IA: calcular su mejor jugada y colocarla.
+            # Turno de la IA: calcular su mejor jugada (con traza) y colocarla.
             if not st.session_state.ganador_gato:
-                mov = mejor_movimiento(st.session_state.tablero_gato)
+                mov, t = mejor_movimiento(st.session_state.tablero_gato)
                 if mov is not None:
                     st.session_state.tablero_gato[mov] = "O"
                     st.session_state.ganador_gato = verificar_ganador(st.session_state.tablero_gato)
+                    st.session_state["gt_traza"] = t   # Guardar la traza de la decisión
+                    traza.nuevo_run("gt")
 
     # Dibujar el tablero como una cuadrícula de botones (3 columnas + espacio a la derecha).
     cols = st.columns([1, 1, 1, 3])
@@ -132,4 +190,15 @@ def mostrar_interfaz():
         if st.button("Reiniciar Juego", key="gato_reiniciar"):
             st.session_state.tablero_gato = [" "] * 9
             st.session_state.ganador_gato = None
+            st.session_state.pop("gt_traza", None)
             st.rerun()
+
+    # Traza de la última decisión de la IA: recorrer la evaluación de cada jugada.
+    t = st.session_state.get("gt_traza")
+    if t:
+        st.markdown("---")
+        st.markdown("### Traza de la última decisión de la IA (nodo MAX)")
+        idx = traza.selector("gt", len(t))
+        paso = t[idx]
+        st.markdown(renderizar_tablero(paso["tablero"], paso["resaltar"]), unsafe_allow_html=True)
+        traza.caja(paso["texto"])

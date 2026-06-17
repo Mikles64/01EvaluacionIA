@@ -1,7 +1,6 @@
 import streamlit as st
 import heapq
-import time
-from problemas import nerd
+from problemas import nerd, traza
 
 # --- DEFINICIÓN DEL ENTORNO ---
 # El nivel se describe con texto. Cada carácter representa un elemento:
@@ -27,6 +26,10 @@ ICONOS = {
     'W': nerd.TRABAJADOR,
     'X': nerd.CHECK     # Caja colocada correctamente sobre un objetivo
 }
+
+# Nombres de las cuatro direcciones, para describir los movimientos en la traza.
+DIRECCIONES = [((0, -1), "arriba"), ((0, 1), "abajo"), ((-1, 0), "izquierda"), ((1, 0), "derecha")]
+
 
 def parsear_mapa(mapa):
     """Leer el mapa de texto y separar los elementos FIJOS (paredes y objetivos,
@@ -67,91 +70,113 @@ def heuristica(cajas, objetivos):
             total += min_dist
     return total
 
-def busqueda_informada(paredes, objetivos, inicio_trabajador, inicio_cajas, algoritmo="A*"):
-    """Resolver el nivel probando movimientos y quedándose siempre con el estado
-    más prometedor según la heurística. Diferencia entre los dos algoritmos:
 
-    - A* (A-Estrella): ordena por f = g + h, donde g = pasos ya dados y
-      h = estimación de lo que falta. Equilibra avanzar y acercarse, por lo que
-      encuentra la solución MÁS CORTA.
-    - GBFS (voraz): ordena solo por h (lo que falta). Suele ser más rápido,
-      pero puede tomar caminos largos porque ignora los pasos ya dados.
+def busqueda_informada(paredes, objetivos, inicio_trabajador, inicio_cajas, algoritmo="A*"):
+    """Resolver el nivel guardando una TRAZA de cada iteración. Diferencia entre
+    los dos algoritmos:
+
+    - A* (A-Estrella): ordena OPEN por f = g + h (g = pasos dados, h = lo que
+      falta). Encuentra la solución MÁS CORTA.
+    - GBFS (voraz): ordena OPEN solo por h. Suele ser más rápido, pero no
+      garantiza la solución más corta.
+
+    Devolver (camino_trabajador, camino_cajas, traza).
     """
-    # 'cola' es una cola de prioridad: siempre saca primero el estado más
-    # prometedor. Cada elemento guarda:
-    #   (prioridad, contador, g, trabajador, cajas, camino_trabajador, camino_cajas).
-    # El 'contador' solo sirve para desempatar y evitar comparar estados directamente.
+    es_estrella = (algoritmo == "A*")
+    etiqueta = "f = g + h" if es_estrella else "h"
+
+    # OPEN es una cola de prioridad (heap). Cada elemento guarda:
+    #   (prioridad, contador, g, trabajador, cajas, camino_w, camino_c).
+    # El 'contador' desempata y evita comparar estados directamente.
     cola = []
     contador = 0
     h_inicial = heuristica(inicio_cajas, objetivos)
     heapq.heappush(cola, (h_inicial, contador, 0, inicio_trabajador, inicio_cajas,
                           [inicio_trabajador], [inicio_cajas]))
 
-    # 'visitados' recuerda los estados ya analizados para no repetir trabajo.
-    # Un estado = posición del trabajador + posición de todas las cajas.
-    visitados = set()
-    visitados.add((inicio_trabajador, inicio_cajas))
-    nodos_explorados = 0
-
-    movimientos = [(0, -1), (0, 1), (-1, 0), (1, 0)]  # Arriba, abajo, izquierda, derecha
+    # CLOSED: estados ya analizados (estado = trabajador + posición de las cajas).
+    visitados = set([(inicio_trabajador, inicio_cajas)])
+    traza = []
+    it = 0
 
     while cola:
-        # Sacar el estado más prometedor pendiente de explorar.
-        _, _, g, trabajador, cajas, camino_w, camino_c = heapq.heappop(cola)
-        nodos_explorados += 1
-
-        # ¿Ganamos? Sucede cuando todas las cajas están sobre los objetivos.
-        if set(cajas) == objetivos:
-            return camino_w, camino_c, nodos_explorados
-
+        it += 1
+        prioridad, _, g, trabajador, cajas, camino_w, camino_c = heapq.heappop(cola)
+        h = heuristica(cajas, objetivos)
+        es_meta = set(cajas) == objetivos
         wx, wy = trabajador
 
-        # Probar las cuatro direcciones de movimiento del trabajador.
-        for dx, dy in movimientos:
-            nx, ny = wx + dx, wy + dy  # Casilla a la que intentaría moverse
+        # Generar los sucesores y, de paso, describir cada intento de movimiento.
+        sucesores = []
+        if not es_meta:
+            for (dx, dy), nombre in DIRECCIONES:
+                nx, ny = wx + dx, wy + dy
+                if (nx, ny) in paredes:
+                    sucesores.append(f"  {nombre:9}→ pared, inválido")
+                    continue
 
-            # Contra una pared no se puede avanzar.
-            if (nx, ny) in paredes:
-                continue
+                nuevas_cajas = list(cajas)
+                empuje = ""
+                valido = True
+                if (nx, ny) in nuevas_cajas:
+                    idx_caja = nuevas_cajas.index((nx, ny))
+                    bx, by = nx + dx, ny + dy
+                    if (bx, by) in paredes or (bx, by) in nuevas_cajas:
+                        valido = False
+                    else:
+                        nuevas_cajas[idx_caja] = (bx, by)
+                        empuje = f" [empuja caja a ({bx},{by})]"
 
-            nuevas_cajas = list(cajas)
-            movimiento_valido = True
+                if not valido:
+                    sucesores.append(f"  {nombre:9}→ caja bloqueada, inválido")
+                    continue
 
-            # Si en esa casilla hay una caja, el trabajador intenta empujarla.
-            if (nx, ny) in nuevas_cajas:
-                idx_caja = nuevas_cajas.index((nx, ny))
-                bx, by = nx + dx, ny + dy  # Casilla a la que iría la caja empujada
+                cajas_t = tuple(nuevas_cajas)
+                estado = ((nx, ny), cajas_t)
+                if estado in visitados:
+                    sucesores.append(f"  {nombre:9}→ ({nx},{ny}){empuje} · ya visitado")
+                    continue
 
-                # La caja no se puede empujar contra una pared u otra caja.
-                if (bx, by) in paredes or (bx, by) in nuevas_cajas:
-                    movimiento_valido = False
-                else:
-                    nuevas_cajas[idx_caja] = (bx, by)
+                visitados.add(estado)
+                nuevo_g = g + 1
+                nuevo_h = heuristica(cajas_t, objetivos)
+                prio = (nuevo_g + nuevo_h) if es_estrella else nuevo_h
+                contador += 1
+                heapq.heappush(cola, (prio, contador, nuevo_g, (nx, ny), cajas_t,
+                                      camino_w + [(nx, ny)], camino_c + [cajas_t]))
+                detalle = f"g={nuevo_g} h={nuevo_h} f={nuevo_g + nuevo_h}" if es_estrella else f"h={nuevo_h}"
+                sucesores.append(f"  {nombre:9}→ ({nx},{ny}){empuje} · {detalle} · NUEVO en OPEN")
 
-            if movimiento_valido:
-                nuevas_cajas_tupla = tuple(nuevas_cajas)
-                estado = ((nx, ny), nuevas_cajas_tupla)
+        # Resumen de OPEN tras esta iteración (los de menor prioridad primero).
+        mejores = heapq.nsmallest(5, cola)
+        resumen_open = "; ".join(f"{etiqueta.split('=')[0].strip()}={t[0]}@{t[3]}" for t in mejores)
 
-                # Si este estado es nuevo, calcular su prioridad y agregarlo a la cola.
-                if estado not in visitados:
-                    visitados.add(estado)
-                    nuevo_g = g + 1  # Un paso más recorrido
-                    h = heuristica(nuevas_cajas_tupla, objetivos)
-                    # Aquí está la única diferencia entre los dos algoritmos:
-                    prioridad = (nuevo_g + h) if algoritmo == "A*" else h
-                    contador += 1
+        # Construir el texto explicativo de la iteración.
+        lineas = [
+            f"ITERACIÓN {it}  ·  {algoritmo}  (OPEN ordenada por {etiqueta})",
+            "",
+            f"Nodo extraído de OPEN (mejor prioridad): trabajador={trabajador}",
+            f"  g={g} (pasos dados)   h={h} (estimación)   f=g+h={g + h}",
+            f"  cajas={list(cajas)}",
+            f"¿Todas las cajas en objetivo?: {'SÍ' if es_meta else 'no'}",
+        ]
+        if not es_meta:
+            lineas.append("Sucesores (movimientos del trabajador):")
+            lineas += sucesores
+        lineas += [
+            "",
+            f"OPEN: {len(cola)} estados. Menores: {resumen_open if resumen_open else '(vacío)'}",
+            f"CLOSED: {len(visitados)} estados",
+        ]
+        if es_meta:
+            lineas += ["", f"¡NIVEL RESUELTO en {len(camino_w) - 1} movimientos!"]
 
-                    heapq.heappush(cola, (
-                        prioridad,
-                        contador,
-                        nuevo_g,
-                        (nx, ny),
-                        nuevas_cajas_tupla,
-                        camino_w + [(nx, ny)],
-                        camino_c + [nuevas_cajas_tupla]
-                    ))
+        traza.append({"trabajador": trabajador, "cajas": cajas, "texto": "\n".join(lineas)})
 
-    return None, None, nodos_explorados  # No hay solución posible
+        if es_meta:
+            return camino_w, camino_c, traza
+
+    return None, None, traza  # No hay solución posible
 
 # --- INTERFAZ STREAMLIT ---
 
@@ -211,40 +236,41 @@ def mostrar_interfaz():
             st.caption("A* = g + h · Garantiza la solución óptima.")
         else:
             st.caption("GBFS = h · Más rápido, pero no garantiza optimalidad.")
-        velocidad = st.slider("Velocidad de animación", 0.1, 1.0, 0.4, key="sk_velocidad")
 
         ejecutar = st.button("Resolver Nivel", type="primary", key="sk_ejecutar")
 
     with col2:
         st.write("### Visualización del Entorno")
         mapa_placeholder = st.empty()
-        info_placeholder = st.empty()
 
-        # Dibujar el nivel en su estado inicial antes de resolverlo.
-        mapa_placeholder.markdown(renderizar_mapa(ancho, alto, paredes, objetivos, inicio_trabajador, inicio_cajas), unsafe_allow_html=True)
-
+    # Al pulsar el botón, calcular la traza completa y guardarla.
     if ejecutar:
         clave = "A*" if "A*" in algoritmo else "GBFS"
-        info_placeholder.info(f"Ejecutando algoritmo {clave}...")
-
-        # Calcular la secuencia de movimientos que resuelve el nivel.
-        camino_w, camino_c, nodos = busqueda_informada(
+        camino_w, camino_c, t = busqueda_informada(
             paredes, objetivos, inicio_trabajador, inicio_cajas, algoritmo=clave
         )
+        st.session_state["sk_traza"] = t
+        st.session_state["sk_camino"] = camino_w
+        traza.nuevo_run("sk")
 
-        if camino_w:
-            # Recorrer la solución paso a paso, redibujando el mapa en cada movimiento.
-            for paso in range(len(camino_w)):
-                trabajador_actual = camino_w[paso]
-                cajas_actuales = camino_c[paso]
-
-                mapa_placeholder.markdown(
-                    renderizar_mapa(ancho, alto, paredes, objetivos, trabajador_actual, cajas_actuales),
-                    unsafe_allow_html=True
-                )
-                info_placeholder.success(f"Paso {paso}/{len(camino_w)-1} | Nodos evaluados en total por {clave}: {nodos}")
-                time.sleep(velocidad)  # Pausar para que la animación sea visible
-
-            info_placeholder.success(f"¡Nivel resuelto óptimamente en {len(camino_w)-1} movimientos!")
+    t = st.session_state.get("sk_traza")
+    if t:
+        idx = traza.selector("sk", len(t))
+        paso = t[idx]
+        # Dibujar el estado del nodo expandido en esta iteración.
+        mapa_placeholder.markdown(
+            renderizar_mapa(ancho, alto, paredes, objetivos, paso["trabajador"], paso["cajas"]),
+            unsafe_allow_html=True,
+        )
+        camino = st.session_state.get("sk_camino")
+        if camino:
+            st.success(f"Nivel resuelto en {len(camino) - 1} movimientos · {len(t)} iteraciones (nodos expandidos).")
         else:
-            info_placeholder.error("No se encontró una solución posible.")
+            st.error("No se encontró una solución posible.")
+        traza.caja(paso["texto"])
+    else:
+        # Sin ejecución todavía: mostrar el nivel en su estado inicial.
+        mapa_placeholder.markdown(
+            renderizar_mapa(ancho, alto, paredes, objetivos, inicio_trabajador, inicio_cajas),
+            unsafe_allow_html=True,
+        )
